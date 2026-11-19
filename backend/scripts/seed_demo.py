@@ -6,8 +6,10 @@ from src.config.domain import DOMAIN
 from src.models.user import User
 from src.models.study import Study
 from src.models.observation import Observation
-from src.models import run,review,audit
+from src.models import run,review,audit,calibration
+from src.models.calibration import CalibrationProject,CalibrationInstrument,CalibrationPair
 from src.utils.security import hash_password
+from src.utils.serializers import now
 
 def seed():
     Base.metadata.create_all(engine)
@@ -37,7 +39,50 @@ def seed():
                 key=f'DEMO-{k+1}-{n+1:04}'
                 if not db.scalar(select(Observation.id).where(Observation.study_id==study.id,Observation.source_key==key)):
                     db.add(Observation(study_id=study.id,source_key=key,values=values))
+        seed_calibration(db)
         db.commit()
-        counts={model.__tablename__:db.scalar(select(func.count()).select_from(model)) for model in (User,Study,Observation)}
+        counts={model.__tablename__:db.scalar(select(func.count()).select_from(model)) for model in (User,Study,Observation,CalibrationProject,CalibrationPair)}
         print(json.dumps(counts));return counts
+
+
+CALIBRATION_DEMO=[
+    {'name':'吸水率仪器比对 2026-11',
+     'source_filename':'calibration-202611.csv',
+     'baseline':'M0',
+     'instruments':['M0','M1','M2','M3','M4'],
+     'pairs':[
+        ('M1','M0',-0.62,0.41,'标准样复测 3 次 / 证书 A-11'),
+        ('M2','M1',-0.24,0.30,'标准样复测 3 次 / 证书 A-12'),
+        ('M3','M2',0.10,0.48,'同批细砂岩复测 / 批次 B-2'),
+        ('M2','M0',-0.95,0.80,'交叉验证 / 2026-10 汇总'),
+        ('M4','M3',-0.18,0.22,'备用机比对 / 证书 A-19'),
+     ]},
+    {'name':'备用机比对（尚未接入基准）',
+     'source_filename':'standby-202611.csv',
+     'baseline':'S0',
+     'instruments':['S0','S1','S2'],
+     'pairs':[
+        ('S1','S2',-0.30,0.25,'两台备用机互比，未与主基准连通'),
+     ]},
+]
+
+def seed_calibration(db):
+    """Idempotent demo: natural key on project name, rows only if absent."""
+    stamp=now()
+    projects=[]
+    for demo in CALIBRATION_DEMO:
+        project=db.scalar(select(CalibrationProject).where(CalibrationProject.name==demo['name']))
+        if project:
+            projects.append(project);continue
+        project=CalibrationProject(name=demo['name'],source_filename=demo['source_filename'],description='合成吸水率仪器比对记录 / 仅用于方法与流程演示',baseline_instrument=demo['baseline'],revision=0,created_at=stamp)
+        db.add(project);db.flush()
+        for name in demo['instruments']:
+            db.add(CalibrationInstrument(project_id=project.id,name=name,created_at=stamp))
+        for a,b,lo,hi,basis in demo['pairs']:
+            db.add(CalibrationPair(project_id=project.id,instrument_a=a,instrument_b=b,lower=lo,upper=hi,basis=basis,created_at=stamp,updated_at=stamp))
+        # baseline is part of the project definition; each added instrument or
+        # interval bumps the revision once, matching the API's edit accounting.
+        project.revision=max(0,len(demo['instruments'])-1)+len(demo['pairs'])
+        projects.append(project)
+    return projects
 if __name__=='__main__': seed()

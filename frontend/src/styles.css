@@ -8,3 +8,12 @@ main { border-left:1px solid var(--rule);margin-left:3%;max-width:1450px; }
 .strip { border-top:4px solid var(--accent); }
 .worksheet { border-left:0;border-bottom:3px solid var(--accent); }
 @media(max-width:767px){main{margin-left:0;border-left:0}.hero{grid-template-columns:1fr}}
+
+/* Calibration worksheet: constraint chain and conflict call-outs. */
+.basis-steps{margin:6px 0 14px 20px;padding:0;font-size:13px}
+.basis-steps li{margin:6px 0}
+.basis-steps code{font-family:'IBM Plex Mono',monospace;font-size:12px}
+.basis-kind{font-family:'IBM Plex Mono',monospace;font-size:11px;border:1px solid var(--rule);padding:3px 6px}
+.error{border-left:4px solid oklch(45% .16 25);padding:12px 20px;margin:18px 0;background:color-mix(in oklch,oklch(45% .16 25) 7%,var(--paper))}
+.error ul{margin:6px 0 0 18px}
+.error p{margin:8px 0}
